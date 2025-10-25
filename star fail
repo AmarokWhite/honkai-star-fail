@@ -1,0 +1,2150 @@
+import pygame
+import sys
+import random
+import math
+import time
+from enum import Enum
+
+# Инициализация Pygame
+pygame.init()
+pygame.mixer.init()
+
+# Автоматическое определение размеров экрана
+info = pygame.display.Info()
+SCREEN_WIDTH = info.current_w - 100
+SCREEN_HEIGHT = info.current_h - 100
+
+# Минимальные размеры окна
+MIN_WIDTH = 1000
+MIN_HEIGHT = 700
+SCREEN_WIDTH = max(SCREEN_WIDTH, MIN_WIDTH)
+SCREEN_HEIGHT = max(SCREEN_HEIGHT, MIN_HEIGHT)
+
+# Константы
+FPS = 60
+GAME_VERSION = "v1.5"
+
+# Относительные размеры элементов (проценты от экрана)
+PLAYER_Y = int(SCREEN_HEIGHT * 0.75)
+ENEMY_Y = int(SCREEN_HEIGHT * 0.4)
+CHARACTER_SPACING = int(SCREEN_WIDTH * 0.15)
+UI_BOTTOM = int(SCREEN_HEIGHT * 0.85)
+
+# Цвета
+BACKGROUND = (10, 15, 30)
+WHITE = (255, 255, 255)
+RED = (255, 50, 50)
+BLUE = (50, 150, 255)
+GREEN = (50, 255, 100)
+YELLOW = (255, 255, 50)
+PURPLE = (180, 70, 220)
+ORANGE = (255, 150, 50)
+CYAN = (0, 255, 255)
+ICE_BLUE = (100, 200, 255)
+ELECTRIC_YELLOW = (255, 255, 100)
+FIRE_RED = (255, 100, 50)
+WIND_GREEN = (100, 255, 150)
+DARK_BLUE = (20, 40, 80)
+LIGHT_BLUE = (100, 200, 255)
+DARK_PURPLE = (40, 10, 60)
+HELL_RED = (150, 30, 30)
+HELL_ORANGE = (200, 80, 30)
+GOLD = (255, 215, 0)
+
+# Создание экрана
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
+pygame.display.set_caption(f"Honkai Star Fail: Пародийное Приключение {GAME_VERSION}")
+clock = pygame.time.Clock()
+
+# Загрузка шрифта Comic Sans
+try:
+    title_font = pygame.font.SysFont("comicsansms", int(SCREEN_HEIGHT * 0.06), bold=True)
+    subtitle_font = pygame.font.SysFont("comicsansms", int(SCREEN_HEIGHT * 0.04), bold=True)
+    normal_font = pygame.font.SysFont("comicsansms", int(SCREEN_HEIGHT * 0.03))
+    small_font = pygame.font.SysFont("comicsansms", int(SCREEN_HEIGHT * 0.02))
+except:
+    # Fallback шрифты
+    title_font = pygame.font.SysFont("arial", int(SCREEN_HEIGHT * 0.06), bold=True)
+    subtitle_font = pygame.font.SysFont("arial", int(SCREEN_HEIGHT * 0.04), bold=True)
+    normal_font = pygame.font.SysFont("arial", int(SCREEN_HEIGHT * 0.03))
+    small_font = pygame.font.SysFont("arial", int(SCREEN_HEIGHT * 0.02))
+
+# Создание уникальных спрайтов для каждого персонажа
+def create_warrior_sprite(width, height, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    # Анимация дыхания
+    breath_offset = math.sin(frame_num * 0.3) * 3
+    
+    # Тело воина (более мускулистое)
+    body_y = height//2 + breath_offset
+    pygame.draw.ellipse(surf, (200, 60, 60), (width//4 - 10, body_y, width//2 + 20, height//3 + 10))
+    
+    # Голова
+    head_radius = width // 4
+    head_y = head_radius + breath_offset
+    pygame.draw.circle(surf, (240, 180, 140), (width//2, head_y), head_radius)
+    
+    # Волосы (короткие темные)
+    pygame.draw.rect(surf, (50, 30, 20), (width//2 - head_radius, head_y - head_radius, head_radius*2, head_radius//2))
+    
+    # Глаза
+    eye_radius = head_radius // 4
+    pygame.draw.circle(surf, WHITE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, WHITE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, (0, 0, 0), (width//2 - eye_radius, head_y - eye_radius//2), eye_radius//2)
+    pygame.draw.circle(surf, (0, 0, 0), (width//2 + eye_radius, head_y - eye_radius//2), eye_radius//2)
+    
+    # Броня
+    pygame.draw.rect(surf, (150, 50, 50), (width//4 - 5, body_y - 10, width//2 + 10, 15))
+    
+    # Большой меч с анимацией
+    sword_swing = math.sin(frame_num * 0.5) * 10
+    sword_x = width//2 + head_radius + sword_swing
+    pygame.draw.rect(surf, (100, 100, 120), (sword_x, head_y - 20, width//8, height//3))
+    pygame.draw.rect(surf, GOLD, (sword_x + width//8, head_y - 30, width//15, height//5))
+    
+    return surf
+
+def create_mage_sprite(width, height, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    breath_offset = math.sin(frame_num * 0.3) * 3
+    
+    # Изящное тело мага
+    body_y = height//2 + breath_offset
+    pygame.draw.ellipse(surf, (120, 80, 200), (width//4 + 5, body_y, width//2 - 10, height//3 - 5))
+    
+    # Голова
+    head_radius = width // 4
+    head_y = head_radius + breath_offset
+    pygame.draw.circle(surf, (240, 220, 180), (width//2, head_y), head_radius)
+    
+    # Длинные волосы
+    hair_color = (200, 100, 50)
+    pygame.draw.ellipse(surf, hair_color, (width//2 - head_radius, head_y, head_radius*2, head_radius))
+    
+    # Глаза
+    eye_radius = head_radius // 4
+    pygame.draw.circle(surf, WHITE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, WHITE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, PURPLE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius//2)
+    pygame.draw.circle(surf, PURPLE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius//2)
+    
+    # Мантия
+    pygame.draw.arc(surf, (80, 40, 120), (width//4, body_y - 20, width//2, 40), math.pi, 2*math.pi, 5)
+    
+    # Магический посох с парящим кристаллом
+    staff_x = width//2 + head_radius
+    pygame.draw.rect(surf, (100, 80, 60), (staff_x, head_y - height//4, width//20, height//3))
+    
+    # Парящий кристалл
+    crystal_y = head_y - height//4 + math.sin(frame_num * 0.8) * 5
+    points = [
+        (staff_x + width//40, crystal_y),
+        (staff_x - width//30, crystal_y - width//15),
+        (staff_x + width//20, crystal_y - width//15)
+    ]
+    pygame.draw.polygon(surf, CYAN, points)
+    
+    return surf
+
+def create_rogue_sprite(width, height, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    breath_offset = math.sin(frame_num * 0.3) * 3
+    
+    # Гибкое тело плута
+    body_y = height//2 + breath_offset
+    pygame.draw.ellipse(surf, (60, 150, 80), (width//4, body_y, width//2, height//3 - 5))
+    
+    # Голова
+    head_radius = width // 4
+    head_y = head_radius + breath_offset
+    pygame.draw.circle(surf, (200, 170, 140), (width//2, head_y), head_radius)
+    
+    # Капюшон
+    pygame.draw.arc(surf, (30, 80, 40), (width//2 - head_radius, head_y - head_radius, head_radius*2, head_radius*1.5), 
+                   math.pi, 2*math.pi, head_radius//2)
+    
+    # Глаза (видны только в тени)
+    eye_radius = head_radius // 5
+    pygame.draw.circle(surf, GREEN, (width//2 - eye_radius, head_y), eye_radius)
+    pygame.draw.circle(surf, GREEN, (width//2 + eye_radius, head_y), eye_radius)
+    
+    # Парные кинжалы
+    dagger_animation = math.sin(frame_num * 0.6) * 3
+    # Левый кинжал
+    pygame.draw.rect(surf, (80, 80, 100), (width//2 - head_radius - width//10 + dagger_animation, head_y, width//12, height//8))
+    # Правый кинжал
+    pygame.draw.rect(surf, (80, 80, 100), (width//2 + head_radius - width//30 + dagger_animation, head_y, width//12, height//8))
+    
+    return surf
+
+def create_healer_sprite(width, height, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    breath_offset = math.sin(frame_num * 0.3) * 3
+    
+    # Нежное тело лекаря
+    body_y = height//2 + breath_offset
+    pygame.draw.ellipse(surf, (250, 230, 150), (width//4, body_y, width//2, height//3))
+    
+    # Голова
+    head_radius = width // 4
+    head_y = head_radius + breath_offset
+    pygame.draw.circle(surf, (255, 240, 200), (width//2, head_y), head_radius)
+    
+    # Светлые вьющиеся волосы
+    for i in range(5):
+        angle = i * 2 * math.pi / 5
+        curl_x = width//2 + math.cos(angle) * head_radius * 0.8
+        curl_y = head_y + math.sin(angle) * head_radius * 0.8
+        pygame.draw.circle(surf, GOLD, (curl_x, curl_y), head_radius//3)
+    
+    # Глаза
+    eye_radius = head_radius // 4
+    pygame.draw.circle(surf, WHITE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, WHITE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, (100, 200, 255), (width//2 - eye_radius, head_y - eye_radius//2), eye_radius//2)
+    pygame.draw.circle(surf, (100, 200, 255), (width//2 + eye_radius, head_y - eye_radius//2), eye_radius//2)
+    
+    # Лечебный посох
+    staff_x = width//2 + head_radius
+    pygame.draw.rect(surf, (200, 180, 100), (staff_x, head_y - height//6, width//15, height//4))
+    
+    # Светящийся кристалл исцеления
+    crystal_size = width//10 + math.sin(frame_num * 0.7) * 2
+    pygame.draw.circle(surf, (200, 255, 200), (staff_x + width//30, head_y - height//6), crystal_size)
+    
+    return surf
+
+def create_ice_mage_sprite(width, height, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    breath_offset = math.sin(frame_num * 0.3) * 3
+    
+    # Холодное тело
+    body_y = height//2 + breath_offset
+    pygame.draw.ellipse(surf, (150, 200, 255), (width//4, body_y, width//2, height//3))
+    
+    # Голова
+    head_radius = width // 4
+    head_y = head_radius + breath_offset
+    pygame.draw.circle(surf, (200, 230, 255), (width//2, head_y), head_radius)
+    
+    # Ледяные волосы
+    hair_color = (180, 220, 255)
+    for i in range(6):
+        spike_length = head_radius//2 + math.sin(frame_num * 0.5 + i) * 3
+        angle = i * 2 * math.pi / 6
+        end_x = width//2 + math.cos(angle) * spike_length
+        end_y = head_y - head_radius//2 + math.sin(angle) * spike_length
+        pygame.draw.line(surf, hair_color, (width//2, head_y - head_radius//2), (end_x, end_y), 3)
+    
+    # Глаза ледяного цвета
+    eye_radius = head_radius // 4
+    pygame.draw.circle(surf, WHITE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, WHITE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, ICE_BLUE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius//2)
+    pygame.draw.circle(surf, ICE_BLUE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius//2)
+    
+    # Ледяной кристалл
+    crystal_x = width//2 + head_radius
+    crystal_size = width//8 + math.sin(frame_num * 0.8) * 2
+    points = [
+        (crystal_x, head_y),
+        (crystal_x - crystal_size//2, head_y - crystal_size),
+        (crystal_x + crystal_size//2, head_y - crystal_size)
+    ]
+    pygame.draw.polygon(surf, ICE_BLUE, points)
+    
+    return surf
+
+def create_electric_mage_sprite(width, height, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    breath_offset = math.sin(frame_num * 0.3) * 3
+    
+    # Энергетическое тело
+    body_y = height//2 + breath_offset
+    pygame.draw.ellipse(surf, (255, 255, 100), (width//4, body_y, width//2, height//3))
+    
+    # Голова
+    head_radius = width // 4
+    head_y = head_radius + breath_offset
+    pygame.draw.circle(surf, (255, 250, 200), (width//2, head_y), head_radius)
+    
+    # Статичные волосы
+    for i in range(8):
+        angle = i * 2 * math.pi / 8
+        length = head_radius//2 + (i % 3) * 3
+        end_x = width//2 + math.cos(angle) * length
+        end_y = head_y - head_radius//2 + math.sin(angle) * length
+        pygame.draw.line(surf, ELECTRIC_YELLOW, (width//2, head_y - head_radius//2), (end_x, end_y), 2)
+    
+    # Глаза с электрическим свечением
+    eye_radius = head_radius // 4
+    glow = math.sin(frame_num * 0.9) * 2
+    pygame.draw.circle(surf, WHITE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius + glow)
+    pygame.draw.circle(surf, WHITE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius + glow)
+    pygame.draw.circle(surf, (50, 50, 0), (width//2 - eye_radius, head_y - eye_radius//2), eye_radius//2)
+    pygame.draw.circle(surf, (50, 50, 0), (width//2 + eye_radius, head_y - eye_radius//2), eye_radius//2)
+    
+    # Шар электрической энергии
+    energy_x = width//2 + head_radius
+    energy_size = width//7
+    pygame.draw.circle(surf, ELECTRIC_YELLOW, (energy_x, head_y), energy_size)
+    
+    # Молнии вокруг шара
+    for i in range(4):
+        angle = i * 2 * math.pi / 4 + frame_num * 0.2
+        start_x = energy_x + math.cos(angle) * energy_size
+        start_y = head_y + math.sin(angle) * energy_size
+        end_x = energy_x + math.cos(angle) * (energy_size + 10)
+        end_y = head_y + math.sin(angle) * (energy_size + 10)
+        pygame.draw.line(surf, YELLOW, (start_x, start_y), (end_x, end_y), 2)
+    
+    return surf
+
+def create_fire_mage_sprite(width, height, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    breath_offset = math.sin(frame_num * 0.3) * 3
+    
+    # Огненное тело
+    body_y = height//2 + breath_offset
+    pygame.draw.ellipse(surf, (255, 100, 50), (width//4, body_y, width//2, height//3))
+    
+    # Голова
+    head_radius = width // 4
+    head_y = head_radius + breath_offset
+    pygame.draw.circle(surf, (255, 200, 150), (width//2, head_y), head_radius)
+    
+    # Пламенеющие волосы
+    for i in range(5):
+        flame_height = head_radius//2 + math.sin(frame_num * 0.7 + i) * 4
+        points = [
+            (width//2 - head_radius//3 + i*5, head_y - head_radius//2),
+            (width//2 - head_radius//6 + i*5, head_y - head_radius//2 - flame_height),
+            (width//2 + head_radius//6 + i*5, head_y - head_radius//2 - flame_height),
+            (width//2 + head_radius//3 + i*5, head_y - head_radius//2)
+        ]
+        pygame.draw.polygon(surf, (255, 150 + i*20, 0), points)
+    
+    # Глава огненного цвета
+    eye_radius = head_radius // 4
+    pygame.draw.circle(surf, WHITE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, WHITE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, (255, 50, 0), (width//2 - eye_radius, head_y - eye_radius//2), eye_radius//2)
+    pygame.draw.circle(surf, (255, 50, 0), (width//2 + eye_radius, head_y - eye_radius//2), eye_radius//2)
+    
+    # Шар огня
+    fire_x = width//2 + head_radius
+    fire_size = width//7 + math.sin(frame_num * 1.2) * 3
+    pygame.draw.circle(surf, (255, 100, 0), (fire_x, head_y), fire_size)
+    pygame.draw.circle(surf, (255, 200, 0), (fire_x, head_y), fire_size//2)
+    
+    return surf
+
+def create_wind_mage_sprite(width, height, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    breath_offset = math.sin(frame_num * 0.3) * 3
+    
+    # Воздушное тело
+    body_y = height//2 + breath_offset
+    pygame.draw.ellipse(surf, (100, 255, 150), (width//4, body_y, width//2, height//3))
+    
+    # Голова
+    head_radius = width // 4
+    head_y = head_radius + breath_offset
+    pygame.draw.circle(surf, (200, 255, 220), (width//2, head_y), head_radius)
+    
+    # Развевающиеся волосы
+    for i in range(5):
+        curve = math.sin(frame_num * 0.5 + i) * 5
+        points = [
+            (width//2 - head_radius//2 + i*8, head_y - head_radius//2),
+            (width//2 - head_radius//3 + i*8 + curve, head_y - head_radius),
+            (width//2 + head_radius//3 + i*8 + curve, head_y - head_radius),
+            (width//2 + head_radius//2 + i*8, head_y - head_radius//2)
+        ]
+        pygame.draw.polygon(surf, (150, 220, 150), points)
+    
+    # Глаза цвета ветра
+    eye_radius = head_radius // 4
+    pygame.draw.circle(surf, WHITE, (width//2 - eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, WHITE, (width//2 + eye_radius, head_y - eye_radius//2), eye_radius)
+    pygame.draw.circle(surf, (50, 200, 100), (width//2 - eye_radius, head_y - eye_radius//2), eye_radius//2)
+    pygame.draw.circle(surf, (50, 200, 100), (width//2 + eye_radius, head_y - eye_radius//2), eye_radius//2)
+    
+    # Вихрь
+    center_x, center_y = width//2 + head_radius, head_y
+    rotation = frame_num * 0.3
+    for i in range(3):
+        angle = i * 2 * math.pi / 3 + rotation
+        length = width//6 + math.sin(frame_num * 0.4 + i) * 3
+        end_x = center_x + math.cos(angle) * length
+        end_y = center_y + math.sin(angle) * length
+        pygame.draw.line(surf, WIND_GREEN, (center_x, center_y), (end_x, end_y), 3)
+    
+    return surf
+
+def create_enemy_sprite(width, height, color, enemy_type, name, frame_num=0):
+    surf = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    # Анимация дыхания для врагов
+    breath_offset = math.sin(frame_num * 0.3) * 2
+    
+    if enemy_type == "normal":
+        # Базовый враг с анимацией
+        body_y = height//2 + breath_offset
+        pygame.draw.circle(surf, color, (width//2, body_y), min(width, height)//2 - 10)
+        pygame.draw.circle(surf, (color[0]//2, color[1]//2, color[2]//2), (width//2, body_y), min(width, height)//3)
+        
+        # Глаза с анимацией моргания
+        eye_radius = min(width, height) // 6
+        if frame_num % 90 < 3:  # Моргание
+            eye_radius *= 0.3
+            
+        pygame.draw.circle(surf, RED, (width//2 - eye_radius, body_y - eye_radius//2), eye_radius)
+        pygame.draw.circle(surf, RED, (width//2 + eye_radius, body_y - eye_radius//2), eye_radius)
+        pygame.draw.circle(surf, (0, 0, 0), (width//2 - eye_radius, body_y - eye_radius//2), eye_radius//2)
+        pygame.draw.circle(surf, (0, 0, 0), (width//2 + eye_radius, body_y - eye_radius//2), eye_radius//2)
+        
+        # Рот с анимацией
+        mouth_open = 0.5 + 0.3 * math.sin(frame_num * 0.5)
+        pygame.draw.arc(surf, (0, 0, 0), (width//2 - eye_radius, body_y + eye_radius, eye_radius*2, eye_radius * mouth_open), 
+                       math.pi, 2*math.pi, 3)
+    
+    elif enemy_type == "tank":
+        # Танк враг с анимацией
+        body_y = height//2 + breath_offset
+        pygame.draw.rect(surf, color, (width//4, body_y - height//4, width//2, height//2))
+        pygame.draw.rect(surf, (color[0]//2, color[1]//2, color[2]//2), 
+                        (width//4 + 10, body_y - height//4 + 10, width//2 - 20, height//2 - 20))
+        
+        # Глаза с анимацией
+        eye_size = min(width, height) // 8
+        if frame_num % 100 < 5:
+            eye_size *= 0.5
+            
+        pygame.draw.rect(surf, RED, (width//2 - eye_size*2, body_y - eye_size, eye_size, eye_size))
+        pygame.draw.rect(surf, RED, (width//2 + eye_size, body_y - eye_size, eye_size, eye_size))
+    
+    elif enemy_type == "fast":
+        # Быстрый враг с анимацией
+        body_y = height//2 + breath_offset
+        points = [
+            (width//2, body_y - height//4),
+            (width//4, body_y + height//4),
+            (width*3//4, body_y + height//4)
+        ]
+        pygame.draw.polygon(surf, color, points)
+        pygame.draw.polygon(surf, (color[0]//2, color[1]//2, color[2]//2), 
+                          [(width//2, body_y), (width//2 - width//8, body_y + height//4 - 10), 
+                           (width//2 + width//8, body_y + height//4 - 10)])
+    
+    elif enemy_type == "boss":
+        # Босс с улучшенной анимацией
+        body_y = height//2 + breath_offset
+        pygame.draw.circle(surf, color, (width//2, body_y), min(width, height)//2 - 5)
+        pygame.draw.circle(surf, (color[0]//2, color[1]//2, color[2]//2), (width//2, body_y), min(width, height)//3)
+        
+        # Анимированные шипы
+        spike_animation = math.sin(frame_num * 0.4) * 5
+        for i in range(8):
+            angle = i * 2 * math.pi / 8
+            spike_length = width // 4 + spike_animation
+            start_x = width//2 + math.cos(angle) * (width//2 - 10)
+            start_y = body_y + math.sin(angle) * (height//2 - 10)
+            end_x = width//2 + math.cos(angle) * (width//2 - 10 + spike_length)
+            end_y = body_y + math.sin(angle) * (height//2 - 10 + spike_length)
+            pygame.draw.line(surf, ORANGE, (start_x, start_y), (end_x, end_y), 4)
+        
+        # Глаза с анимацией огня
+        eye_radius = min(width, height) // 8
+        flame_size = math.sin(frame_num * 0.8) * 3
+        pygame.draw.circle(surf, ORANGE, (width//2 - eye_radius*1.5, body_y - eye_radius), eye_radius + flame_size)
+        pygame.draw.circle(surf, ORANGE, (width//2 + eye_radius*1.5, body_y - eye_radius), eye_radius + flame_size)
+        pygame.draw.circle(surf, (0, 0, 0), (width//2 - eye_radius*1.5, body_y - eye_radius), eye_radius//2)
+        pygame.draw.circle(surf, (0, 0, 0), (width//2 + eye_radius*1.5, body_y - eye_radius), eye_radius//2)
+    
+    # Имя
+    name_surf = small_font.render(name, True, WHITE)
+    surf.blit(name_surf, (width//2 - name_surf.get_width()//2, height - 15))
+    
+    return surf
+
+# Класс для анимаций
+class Animation:
+    def __init__(self, frames, frame_duration, loop=True):
+        self.frames = frames
+        self.frame_duration = frame_duration
+        self.loop = loop
+        self.current_frame = 0
+        self.timer = 0
+        self.done = False
+        self.frame_counter = 0
+    
+    def update(self, dt):
+        if self.done:
+            return
+        
+        self.timer += dt
+        self.frame_counter += 1
+        if self.timer >= self.frame_duration:
+            self.timer = 0
+            self.current_frame += 1
+            
+            if self.current_frame >= len(self.frames):
+                if self.loop:
+                    self.current_frame = 0
+                else:
+                    self.current_frame = len(self.frames) - 1
+                    self.done = True
+    
+    def get_current_frame(self):
+        return self.frames[self.current_frame]
+    
+    def get_frame_counter(self):
+        return self.frame_counter
+    
+    def reset(self):
+        self.current_frame = 0
+        self.timer = 0
+        self.done = False
+        self.frame_counter = 0
+
+# Класс для частиц
+class ParticleSystem:
+    def __init__(self):
+        self.particles = []
+    
+    def add_particle(self, x, y, color, velocity, lifetime, size=3):
+        self.particles.append({
+            'x': x, 'y': y,
+            'color': color,
+            'vx': velocity[0], 'vy': velocity[1],
+            'lifetime': lifetime,
+            'max_lifetime': lifetime,
+            'size': size
+        })
+    
+    def update(self, dt):
+        for particle in self.particles[:]:
+            particle['x'] += particle['vx'] * dt
+            particle['y'] += particle['vy'] * dt
+            particle['lifetime'] -= dt
+            
+            if particle['lifetime'] <= 0:
+                self.particles.remove(particle)
+    
+    def draw(self, surface):
+        for particle in self.particles:
+            alpha = int(255 * (particle['lifetime'] / particle['max_lifetime']))
+            color = list(particle['color'])
+            if len(color) == 3:
+                color.append(alpha)
+            else:
+                color[3] = alpha
+            
+            size = max(1, int(particle['size'] * (particle['lifetime'] / particle['max_lifetime'])))
+            pygame.draw.circle(surface, color, (int(particle['x']), int(particle['y'])), size)
+
+# Перечисление состояний игры
+class GameState(Enum):
+    MAIN_MENU = 1
+    CHARACTER_SELECT = 2
+    BATTLE = 3
+    VICTORY = 4
+    GAME_OVER = 5
+    BETWEEN_ROUNDS = 6
+
+# Перечисление типов персонажей
+class CharacterType(Enum):
+    WARRIOR = 1
+    MAGE = 2
+    ROGUE = 3
+    HEALER = 4
+    ICE_MAGE = 5
+    ELECTRIC_MAGE = 6
+    FIRE_MAGE = 7
+    WIND_MAGE = 8
+
+# Класс эффекта горения
+class BurnEffect:
+    def __init__(self, damage_per_turn, duration):
+        self.damage_per_turn = damage_per_turn
+        self.duration = duration
+        self.remaining_duration = duration
+    
+    def apply(self, target):
+        if self.remaining_duration > 0:
+            damage = target.take_damage(self.damage_per_turn)
+            self.remaining_duration -= 1
+            return damage
+        return 0
+
+# Класс навыка
+class Skill:
+    def __init__(self, name, description, damage, skill_points_cost, target_type, effect=None, effect_power=0, is_ultimate=False):
+        self.name = name
+        self.description = description
+        self.damage = damage
+        self.skill_points_cost = skill_points_cost
+        self.target_type = target_type  # "single", "aoe", "self", "ally"
+        self.effect = effect  # Может быть баффом, дебаффом или лечением
+        self.effect_power = effect_power
+        self.is_ultimate = is_ultimate
+    
+    def use(self, user, targets):
+        if self.is_ultimate:
+            if user.energy < 100:
+                return False, "Недостаточно энергии для ульты!"
+        else:
+            if user.skill_points < self.skill_points_cost:
+                return False, "Недостаточно очков навыков!"
+        
+        if not self.is_ultimate:
+            user.skill_points -= self.skill_points_cost
+        
+        results = []
+        
+        if self.effect == "heal":
+            for target in targets:
+                heal_amount = self.damage + user.get_effective_stat("attack") // 2
+                actual_heal = target.heal(heal_amount)
+                results.append(f"{user.name} исцеляет {target.name} на {actual_heal} HP")
+                
+                # Эффект лечения
+                for i in range(15):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(30, 80)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    target.particle_system.add_particle(
+                        target.position[0], target.position[1] - 50,
+                        GREEN, (vx, vy), random.uniform(0.8, 2.0)
+                    )
+        
+        elif self.effect == "buff_attack":
+            for target in targets:
+                buff_amount = user.get_effective_stat("attack") // 4
+                target.add_buff("attack", buff_amount, 3)  # 3 хода
+                results.append(f"{user.name} усиливает атаку {target.name}")
+                
+                # Эффект баффа
+                for i in range(15):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(30, 80)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    target.particle_system.add_particle(
+                        target.position[0], target.position[1] - 50,
+                        YELLOW, (vx, vy), random.uniform(0.8, 2.0)
+                    )
+        
+        elif self.effect == "buff_defense":
+            for target in targets:
+                buff_amount = user.get_effective_stat("defense") // 2
+                target.add_buff("defense", buff_amount, 3)
+                results.append(f"{user.name} усиливает защиту {target.name}")
+                
+                # Эффект баффа
+                for i in range(15):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(30, 80)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    target.particle_system.add_particle(
+                        target.position[0], target.position[1] - 50,
+                        BLUE, (vx, vy), random.uniform(0.8, 2.0)
+                    )
+        
+        elif self.effect == "buff_speed":
+            for target in targets:
+                buff_amount = 3
+                target.add_buff("speed", buff_amount, 3)
+                results.append(f"{user.name} увеличивает скорость {target.name}")
+                
+                # Эффект баффа
+                for i in range(15):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(30, 80)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    target.particle_system.add_particle(
+                        target.position[0], target.position[1] - 50,
+                        CYAN, (vx, vy), random.uniform(0.8, 2.0)
+                    )
+        
+        elif self.effect == "freeze":
+            for target in targets:
+                target.add_buff("speed", -self.effect_power, 2)  # Замедление
+                results.append(f"{user.name} замораживает {target.name}, снижая скорость")
+                
+                # Эффект заморозки
+                for i in range(20):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(20, 60)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    target.particle_system.add_particle(
+                        target.position[0], target.position[1] - 50,
+                        ICE_BLUE, (vx, vy), random.uniform(1.0, 2.5)
+                    )
+        
+        elif self.effect == "burn":
+            for target in targets:
+                burn_damage = self.effect_power
+                target.burn_effect = BurnEffect(burn_damage, 3)  # Горение на 3 хода
+                results.append(f"{user.name} поджигает {target.name}")
+                
+                # Эффект горения
+                for i in range(15):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(40, 100)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    target.particle_system.add_particle(
+                        target.position[0], target.position[1] - 50,
+                        FIRE_RED, (vx, vy), random.uniform(0.5, 1.5)
+                    )
+        
+        elif self.effect == "shield":
+            for target in targets:
+                shield_amount = self.effect_power
+                target.add_buff("defense", shield_amount, 3)
+                results.append(f"{user.name} создает щит вокруг {target.name}")
+                
+                # Эффект щита
+                for i in range(25):
+                    angle = random.uniform(0, 2 * math.pi)
+                    radius = random.uniform(30, 60)
+                    x = target.position[0] + math.cos(angle) * radius
+                    y = target.position[1] - 30 + math.sin(angle) * radius
+                    target.particle_system.add_particle(
+                        x, y, WIND_GREEN, (0, 0), random.uniform(1.0, 3.0), 2
+                    )
+        
+        else:  # Обычная атака
+            for target in targets:
+                damage = self.damage + user.get_effective_stat("attack")
+                actual_damage = target.take_damage(damage)
+                results.append(f"{user.name} наносит {actual_damage} урона {target.name}")
+                
+                # Эффект урона
+                for i in range(15):
+                    angle = random.uniform(math.pi/4, 3*math.pi/4)
+                    speed = random.uniform(100, 200)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    user.particle_system.add_particle(
+                        user.position[0], user.position[1] - 50,
+                        ORANGE, (vx, vy), random.uniform(0.5, 1.0)
+                    )
+        
+        # Добавляем энергию за использование навыка
+        if not self.is_ultimate:
+            energy_gain = 25  # Энергия за обычные навыки
+            user.add_energy(energy_gain)
+        
+        return True, results
+
+# Класс персонажа
+class Character:
+    def __init__(self, name, char_type, max_hp, attack, defense, speed):
+        self.name = name
+        self.type = char_type
+        self.max_hp = max_hp
+        self.current_hp = max_hp
+        self.attack = attack
+        self.defense = defense
+        self.speed = speed
+        self.skills = []
+        self.energy = 0  # Энергия для ультимейта
+        self.max_energy = 100
+        self.skill_points = 3  # Очки навыков как в HSR
+        self.max_skill_points = 5
+        self.is_guarding = False
+        self.is_stunned = False
+        self.buffs = []
+        self.burn_effect = None
+        self.position = (0, 0)
+        self.animation = None
+        self.particle_system = ParticleSystem()
+        self.special_animation = None
+        self.special_animation_timer = 0
+        
+        # Создаем уникальную анимацию
+        self.create_animation()
+    
+    def create_animation(self):
+        frames = []
+        sprite_width = int(SCREEN_WIDTH * 0.1)
+        sprite_height = int(SCREEN_HEIGHT * 0.2)
+        
+        # Создаем несколько кадров для плавной анимации
+        for i in range(8):
+            if self.type == CharacterType.WARRIOR:
+                frame = create_warrior_sprite(sprite_width, sprite_height, i)
+            elif self.type == CharacterType.MAGE:
+                frame = create_mage_sprite(sprite_width, sprite_height, i)
+            elif self.type == CharacterType.ROGUE:
+                frame = create_rogue_sprite(sprite_width, sprite_height, i)
+            elif self.type == CharacterType.HEALER:
+                frame = create_healer_sprite(sprite_width, sprite_height, i)
+            elif self.type == CharacterType.ICE_MAGE:
+                frame = create_ice_mage_sprite(sprite_width, sprite_height, i)
+            elif self.type == CharacterType.ELECTRIC_MAGE:
+                frame = create_electric_mage_sprite(sprite_width, sprite_height, i)
+            elif self.type == CharacterType.FIRE_MAGE:
+                frame = create_fire_mage_sprite(sprite_width, sprite_height, i)
+            elif self.type == CharacterType.WIND_MAGE:
+                frame = create_wind_mage_sprite(sprite_width, sprite_height, i)
+            else:
+                frame = create_warrior_sprite(sprite_width, sprite_height, i)
+            
+            frames.append(frame)
+        
+        self.animation = Animation(frames, 0.15)
+    
+    def update(self, dt):
+        if self.animation:
+            self.animation.update(dt)
+        self.particle_system.update(dt)
+        
+        # Обновление специальной анимации
+        if self.special_animation:
+            self.special_animation_timer -= dt
+            if self.special_animation_timer <= 0:
+                self.special_animation = None
+        
+        # Обновление баффов
+        for buff in self.buffs[:]:
+            buff['duration'] -= dt
+            if buff['duration'] <= 0:
+                self.buffs.remove(buff)
+        
+        # Применение эффекта горения
+        if self.burn_effect:
+            damage = self.burn_effect.apply(self)
+            if damage > 0:
+                # Эффект горения
+                for i in range(5):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(30, 80)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    self.particle_system.add_particle(
+                        self.position[0], self.position[1] - 50,
+                        FIRE_RED, (vx, vy), random.uniform(0.5, 1.0)
+                    )
+            if self.burn_effect.remaining_duration <= 0:
+                self.burn_effect = None
+    
+    def draw(self, surface, x, y):
+        self.position = (x, y)
+        
+        # Рисуем специальную анимацию если есть
+        if self.special_animation:
+            frame = self.special_animation.get_current_frame()
+            surface.blit(frame, (x - frame.get_width() // 2, y - frame.get_height() // 2))
+        elif self.animation:
+            frame = self.animation.get_current_frame()
+            surface.blit(frame, (x - frame.get_width() // 2, y - frame.get_height() // 2))
+        
+        # Отрисовка частиц
+        self.particle_system.draw(surface)
+        
+        # Отрисовка HP бара в стиле HSR
+        hp_width = int(SCREEN_WIDTH * 0.1)
+        hp_height = int(SCREEN_HEIGHT * 0.015)
+        hp_x = x - hp_width // 2
+        hp_y = y - int(SCREEN_HEIGHT * 0.12)
+        
+        # Фон HP бара
+        pygame.draw.rect(surface, (50, 50, 50), (hp_x, hp_y, hp_width, hp_height), border_radius=3)
+        
+        # Текущее HP
+        hp_percent = self.current_hp / self.max_hp
+        hp_color = GREEN
+        if hp_percent < 0.3:
+            hp_color = RED
+        elif hp_percent < 0.7:
+            hp_color = YELLOW
+            
+        pygame.draw.rect(surface, hp_color, (hp_x, hp_y, int(hp_width * hp_percent), hp_height), border_radius=3)
+        
+        # Отрисовка энергии для ультимейта
+        energy_width = hp_width
+        energy_height = int(SCREEN_HEIGHT * 0.01)
+        energy_x = x - energy_width // 2
+        energy_y = hp_y - energy_height - 5
+        
+        pygame.draw.rect(surface, (50, 50, 50), (energy_x, energy_y, energy_width, energy_height), border_radius=2)
+        energy_color = PURPLE
+        pygame.draw.rect(surface, energy_color, (energy_x, energy_y, int(energy_width * (self.energy / self.max_energy)), energy_height), border_radius=2)
+        
+        # Очки навыков
+        sp_x = x - 25
+        sp_y = energy_y - 20
+        for i in range(self.max_skill_points):
+            color = GREEN if i < self.skill_points else (50, 50, 50)
+            pygame.draw.circle(surface, color, (sp_x + i * 10, sp_y), 3)
+        
+        # Отображение эффекта горения
+        if self.burn_effect:
+            burn_text = small_font.render("ГОРЕНИЕ!", True, FIRE_RED)
+            surface.blit(burn_text, (x - burn_text.get_width() // 2, energy_y - 40))
+    
+    def take_damage(self, damage):
+        actual_damage = max(1, damage - self.defense)
+        if self.is_guarding:
+            actual_damage = max(1, actual_damage // 2)
+            
+        self.current_hp = max(0, self.current_hp - actual_damage)
+        
+        # Эффект получения урона
+        for i in range(10):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(50, 150)
+            vx = math.cos(angle) * speed
+            vy = math.sin(angle) * speed
+            self.particle_system.add_particle(
+                self.position[0], self.position[1] - 50,
+                RED, (vx, vy), random.uniform(0.5, 1.5)
+            )
+        
+        return actual_damage
+    
+    def heal(self, amount):
+        heal_amount = min(amount, self.max_hp - self.current_hp)
+        self.current_hp += heal_amount
+        
+        # Эффект лечения
+        for i in range(10):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(30, 80)
+            vx = math.cos(angle) * speed
+            vy = math.sin(angle) * speed
+            self.particle_system.add_particle(
+                self.position[0], self.position[1] - 50,
+                GREEN, (vx, vy), random.uniform(0.8, 2.0)
+            )
+        
+        return heal_amount
+    
+    def add_energy(self, amount):
+        self.energy = min(self.max_energy, self.energy + amount)
+    
+    def add_skill_point(self):
+        self.skill_points = min(self.max_skill_points, self.skill_points + 1)
+    
+    def add_buff(self, stat, value, duration):
+        self.buffs.append({
+            'stat': stat,
+            'value': value,
+            'duration': duration
+        })
+    
+    def get_effective_stat(self, stat):
+        base_value = getattr(self, stat)
+        bonus = 0
+        
+        for buff in self.buffs:
+            if buff['stat'] == stat:
+                bonus += buff['value']
+                
+        return base_value + bonus
+    
+    def trigger_special_animation(self, skill_type):
+        # Создаем специальную анимацию для навыка
+        frames = []
+        sprite_width = int(SCREEN_WIDTH * 0.12)
+        sprite_height = int(SCREEN_HEIGHT * 0.22)
+        
+        for i in range(6):
+            if self.type == CharacterType.WARRIOR:
+                frame = create_warrior_sprite(sprite_width, sprite_height, i * 2)
+            elif self.type == CharacterType.MAGE:
+                frame = create_mage_sprite(sprite_width, sprite_height, i * 2)
+            elif self.type == CharacterType.ROGUE:
+                frame = create_rogue_sprite(sprite_width, sprite_height, i * 2)
+            elif self.type == CharacterType.HEALER:
+                frame = create_healer_sprite(sprite_width, sprite_height, i * 2)
+            elif self.type == CharacterType.ICE_MAGE:
+                frame = create_ice_mage_sprite(sprite_width, sprite_height, i * 2)
+            elif self.type == CharacterType.ELECTRIC_MAGE:
+                frame = create_electric_mage_sprite(sprite_width, sprite_height, i * 2)
+            elif self.type == CharacterType.FIRE_MAGE:
+                frame = create_fire_mage_sprite(sprite_width, sprite_height, i * 2)
+            elif self.type == CharacterType.WIND_MAGE:
+                frame = create_wind_mage_sprite(sprite_width, sprite_height, i * 2)
+            else:
+                frame = create_warrior_sprite(sprite_width, sprite_height, i * 2)
+            
+            # Добавляем эффекты в зависимости от типа навыка
+            if skill_type == "ultimate":
+                # Эффект свечения для ультимейта
+                glow_surf = pygame.Surface((sprite_width, sprite_height), pygame.SRCALPHA)
+                glow_radius = 20 + i * 5
+                pygame.draw.circle(glow_surf, (255, 255, 255, 100), 
+                                 (sprite_width//2, sprite_height//3), glow_radius)
+                frame.blit(glow_surf, (0, 0))
+            
+            frames.append(frame)
+        
+        self.special_animation = Animation(frames, 0.1, loop=False)
+        self.special_animation_timer = 1.0
+
+# Класс врага
+class Enemy:
+    def __init__(self, name, max_hp, attack, defense, speed, enemy_type):
+        self.name = name
+        self.max_hp = max_hp
+        self.current_hp = max_hp
+        self.attack = attack
+        self.defense = defense
+        self.speed = speed
+        self.type = enemy_type
+        self.is_guarding = False
+        self.buffs = []
+        self.burn_effect = None
+        self.position = (0, 0)
+        self.animation = None
+        self.particle_system = ParticleSystem()
+        
+        # Создаем улучшенную анимацию врага
+        self.create_animation()
+    
+    def create_animation(self):
+        frames = []
+        color = (200, 50, 50)  # Красноватый для врагов
+        
+        if self.type == "tank":
+            color = (150, 100, 50)  # Коричневатый для танков
+        elif self.type == "fast":
+            color = (150, 50, 150)  # Фиолетовый для быстрых
+        elif self.type == "boss":
+            color = (255, 100, 50)  # Оранжевый для босса
+        
+        sprite_width = int(SCREEN_WIDTH * 0.1)
+        sprite_height = int(SCREEN_HEIGHT * 0.18)
+        
+        for i in range(8):
+            frame = create_enemy_sprite(sprite_width, sprite_height, color, self.type, self.name, i)
+            frames.append(frame)
+        
+        self.animation = Animation(frames, 0.15)
+    
+    def update(self, dt):
+        if self.animation:
+            self.animation.update(dt)
+        self.particle_system.update(dt)
+        
+        # Обновление баффов
+        for buff in self.buffs[:]:
+            buff['duration'] -= dt
+            if buff['duration'] <= 0:
+                self.buffs.remove(buff)
+        
+        # Применение эффекта горения
+        if self.burn_effect:
+            damage = self.burn_effect.apply(self)
+            if damage > 0:
+                # Эффект горения
+                for i in range(5):
+                    angle = random.uniform(0, 2 * math.pi)
+                    speed = random.uniform(30, 80)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    self.particle_system.add_particle(
+                        self.position[0], self.position[1] - 50,
+                        FIRE_RED, (vx, vy), random.uniform(0.5, 1.0)
+                    )
+            if self.burn_effect.remaining_duration <= 0:
+                self.burn_effect = None
+    
+    def draw(self, surface, x, y):
+        self.position = (x, y)
+        if self.animation:
+            frame = self.animation.get_current_frame()
+            surface.blit(frame, (x - frame.get_width() // 2, y - frame.get_height() // 2))
+        
+        # Отрисовка частиц
+        self.particle_system.draw(surface)
+        
+        # Отрисовка HP бара
+        hp_width = int(SCREEN_WIDTH * 0.1)
+        hp_height = int(SCREEN_HEIGHT * 0.015)
+        hp_x = x - hp_width // 2
+        hp_y = y - int(SCREEN_HEIGHT * 0.1)
+        
+        # Фон HP бара
+        pygame.draw.rect(surface, (50, 50, 50), (hp_x, hp_y, hp_width, hp_height), border_radius=3)
+        
+        # Текущее HP
+        hp_percent = self.current_hp / self.max_hp
+        hp_color = GREEN
+        if hp_percent < 0.3:
+            hp_color = RED
+        elif hp_percent < 0.7:
+            hp_color = YELLOW
+            
+        pygame.draw.rect(surface, hp_color, (hp_x, hp_y, int(hp_width * hp_percent), hp_height), border_radius=3)
+    
+    def take_damage(self, damage):
+        actual_damage = max(1, damage - self.defense)
+        if self.is_guarding:
+            actual_damage = max(1, actual_damage // 2)
+            
+        self.current_hp = max(0, self.current_hp - actual_damage)
+        
+        # Эффект получения урона
+        for i in range(10):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(50, 150)
+            vx = math.cos(angle) * speed
+            vy = math.sin(angle) * speed
+            self.particle_system.add_particle(
+                self.position[0], self.position[1] - 50,
+                RED, (vx, vy), random.uniform(0.5, 1.5)
+            )
+        
+        return actual_damage
+    
+    def add_buff(self, stat, value, duration):
+        self.buffs.append({
+            'stat': stat,
+            'value': value,
+            'duration': duration
+        })
+    
+    def get_effective_stat(self, stat):
+        base_value = getattr(self, stat)
+        bonus = 0
+        
+        for buff in self.buffs:
+            if buff['stat'] == stat:
+                bonus += buff['value']
+                
+        return base_value + bonus
+
+# Класс боя
+class Battle:
+    def __init__(self, player_characters, enemies, round_number):
+        self.player_characters = player_characters
+        self.enemies = enemies
+        self.round_number = round_number
+        self.turn_order = []
+        self.current_turn = 0
+        self.battle_log = []
+        self.state = "player_turn"  # "player_turn", "enemy_turn", "victory", "defeat"
+        self.selected_character = 0
+        self.selected_skill = 0
+        self.selected_target = 0
+        self.particle_system = ParticleSystem()
+        self.skill_effects = []
+        self.waiting_for_enemy_turn = False
+        self.enemy_turn_timer = 0
+        self.auto_switch_timer = 0
+        self.auto_switch_interval = 2.0  # Автопереключение каждые 2 секунды
+        
+        self.calculate_turn_order()
+        
+        # Начальное сообщение
+        self.add_to_log(f"=== РАУНД {round_number} ===")
+        self.add_to_log("Бой начался!")
+        for enemy in enemies:
+            self.add_to_log(f"Появился враг: {enemy.name}")
+    
+    def calculate_turn_order(self):
+        self.turn_order = []
+        
+        # Добавляем персонажей игрока
+        for char in self.player_characters:
+            if char.current_hp > 0:
+                self.turn_order.append(("player", char))
+        
+        # Добавляем врагов
+        for enemy in self.enemies:
+            if enemy.current_hp > 0:
+                self.turn_order.append(("enemy", enemy))
+        
+        # Сортируем по скорости
+        self.turn_order.sort(key=lambda x: x[1].get_effective_stat("speed"), reverse=True)
+    
+    def update(self, dt):
+        # Обновляем всех персонажей и врагов
+        for char in self.player_characters:
+            char.update(dt)
+        for enemy in self.enemies[:]:  # Копируем список для безопасного удаления
+            enemy.update(dt)
+            # Удаляем мертвых врагов сразу
+            if enemy.current_hp <= 0:
+                self.enemies.remove(enemy)
+                self.add_to_log(f"{enemy.name} повержен!")
+        
+        self.particle_system.update(dt)
+        
+        # Обновляем эффекты навыков
+        for effect in self.skill_effects[:]:
+            effect['timer'] -= dt
+            if effect['timer'] <= 0:
+                self.skill_effects.remove(effect)
+        
+        # Автопереключение персонажей во время хода игрока
+        if self.state == "player_turn" and len(self.player_characters) > 1:
+            self.auto_switch_timer += dt
+            if self.auto_switch_timer >= self.auto_switch_interval:
+                self.auto_switch_timer = 0
+                self.auto_switch_character()
+        
+        # Обработка хода врага с задержкой
+        if self.waiting_for_enemy_turn:
+            self.enemy_turn_timer -= dt
+            if self.enemy_turn_timer <= 0:
+                self.waiting_for_enemy_turn = False
+                self.enemy_turn()
+        
+        # Проверяем условия победы/поражения
+        if all(char.current_hp <= 0 for char in self.player_characters):
+            self.state = "defeat"
+        
+        if all(enemy.current_hp <= 0 for enemy in self.enemies):
+            self.state = "victory"
+    
+    def auto_switch_character(self):
+        """Автоматическое переключение между живыми персонажами"""
+        if not self.player_characters:
+            return
+        
+        start_index = self.selected_character
+        next_index = (start_index + 1) % len(self.player_characters)
+        
+        # Ищем следующего живого персонажа
+        attempts = 0
+        while (attempts < len(self.player_characters) and 
+               self.player_characters[next_index].current_hp <= 0):
+            next_index = (next_index + 1) % len(self.player_characters)
+            attempts += 1
+        
+        if self.player_characters[next_index].current_hp > 0:
+            self.selected_character = next_index
+    
+    def draw(self, surface):
+        # Рисуем фон боя в зависимости от раунда
+        if self.round_number == 3:
+            # Адский фон для босса
+            self.draw_hell_background(surface)
+        else:
+            self.draw_normal_background(surface)
+        
+        # Отображаем номер раунда
+        round_text = title_font.render(f"Раунд {self.round_number}", True, YELLOW)
+        surface.blit(round_text, (SCREEN_WIDTH // 2 - round_text.get_width() // 2, 10))
+        
+        # Рисуем персонажей игрока
+        player_start_x = SCREEN_WIDTH // 2 - (len(self.player_characters) - 1) * CHARACTER_SPACING // 2
+        for i, char in enumerate(self.player_characters):
+            x = player_start_x + i * CHARACTER_SPACING
+            y = PLAYER_Y
+            if char.current_hp > 0:
+                char.draw(surface, x, y)
+                
+                # Подсветка выбранного персонажа
+                if self.state == "player_turn" and i == self.selected_character:
+                    highlight_rect = pygame.Rect(x - 70, y - 110, 140, 220)
+                    pygame.draw.rect(surface, CYAN, highlight_rect, 3)
+        
+        # Рисуем врагов
+        if self.enemies:
+            enemy_start_x = SCREEN_WIDTH // 2 - (len(self.enemies) - 1) * CHARACTER_SPACING // 2
+            for i, enemy in enumerate(self.enemies):
+                x = enemy_start_x + i * CHARACTER_SPACING
+                y = ENEMY_Y
+                if enemy.current_hp > 0:
+                    enemy.draw(surface, x, y)
+                    
+                    # Подсветка выбранной цели
+                    if (self.state == "player_turn" and 
+                        self.player_characters and
+                        self.player_characters[self.selected_character].skills and
+                        i == self.selected_target):
+                        skill = self.player_characters[self.selected_character].skills[self.selected_skill]
+                        if skill.target_type in ["single", "aoe"]:
+                            highlight_rect = pygame.Rect(x - 70, y - 90, 140, 180)
+                            pygame.draw.rect(surface, RED, highlight_rect, 3)
+        
+        # Рисуем порядок ходов
+        self.draw_turn_order(surface)
+        
+        # Рисуем интерфейс боя
+        self.draw_battle_ui(surface)
+        
+        # Рисуем частицы
+        self.particle_system.draw(surface)
+        
+        # Рисуем эффекты навыков
+        for effect in self.skill_effects:
+            if effect['type'] == 'damage_text':
+                text_surf = normal_font.render(effect['text'], True, effect['color'])
+                surface.blit(text_surf, (effect['x'], effect['y'] - effect['timer'] * 50))
+    
+    def draw_normal_background(self, surface):
+        # Стандартный космический фон
+        surface.fill(BACKGROUND)
+        
+        # Звезды
+        for i in range(100):
+            x = (i * 37) % SCREEN_WIDTH
+            y = (i * 23) % SCREEN_HEIGHT
+            size = (i % 3) + 1
+            brightness = 150 + (i % 105)
+            pygame.draw.circle(surface, (brightness, brightness, brightness), (x, y), size)
+        
+        # Планета или космический объект
+        pygame.draw.circle(surface, DARK_BLUE, (SCREEN_WIDTH - 100, 100), 50)
+        pygame.draw.circle(surface, BLUE, (SCREEN_WIDTH - 120, 80), 15)
+    
+    def draw_hell_background(self, surface):
+        # Адский фон для босса
+        # Градиент от темно-красного к оранжевому
+        for y in range(SCREEN_HEIGHT):
+            ratio = y / SCREEN_HEIGHT
+            r = int(HELL_RED[0] * (1 - ratio) + HELL_ORANGE[0] * ratio)
+            g = int(HELL_RED[1] * (1 - ratio) + HELL_ORANGE[1] * ratio)
+            b = int(HELL_RED[2] * (1 - ratio) + HELL_ORANGE[2] * ratio)
+            pygame.draw.line(surface, (r, g, b), (0, y), (SCREEN_WIDTH, y))
+        
+        # Лавовые реки
+        for i in range(3):
+            y = SCREEN_HEIGHT * 0.7 + i * 40
+            for x in range(0, SCREEN_WIDTH, 20):
+                lava_height = 10 + math.sin(x * 0.1 + pygame.time.get_ticks() * 0.005) * 5
+                pygame.draw.rect(surface, (255, 100, 0), (x, y, 20, lava_height))
+                pygame.draw.rect(surface, (255, 200, 0), (x, y, 20, lava_height // 2))
+        
+        # Трещины
+        for i in range(5):
+            start_x = random.randint(0, SCREEN_WIDTH)
+            start_y = SCREEN_HEIGHT * 0.8
+            for j in range(10):
+                end_x = start_x + random.randint(-20, 20)
+                end_y = start_y + random.randint(10, 30)
+                pygame.draw.line(surface, (50, 0, 0), (start_x, start_y), (end_x, end_y), 3)
+                start_x, start_y = end_x, end_y
+    
+    def draw_turn_order(self, surface):
+        # Рисуем порядок ходов вверху экрана
+        x = 50
+        y = 80
+        turn_bg = pygame.Surface((SCREEN_WIDTH - 100, 50))
+        turn_bg.set_alpha(150)
+        turn_bg.fill((0, 0, 50))
+        surface.blit(turn_bg, (50, 75))
+        
+        title_text = small_font.render("Очередь ходов:", True, WHITE)
+        surface.blit(title_text, (60, 55))
+        
+        for i, (side, entity) in enumerate(self.turn_order):
+            color = BLUE if side == "player" else RED
+            name = entity.name
+            
+            # Подсветка текущего хода
+            if i == self.current_turn:
+                pygame.draw.rect(surface, YELLOW, (x - 5, y - 5, 150, 40), 2)
+            
+            pygame.draw.rect(surface, color, (x, y, 140, 30), border_radius=5)
+            text_surf = small_font.render(name, True, WHITE)
+            surface.blit(text_surf, (x + 10, y + 5))
+            
+            x += 150
+            if x > SCREEN_WIDTH - 150:
+                x = 50
+                y += 40
+    
+    def draw_battle_ui(self, surface):
+        # Если ход игрока, рисуем компактное меню навыков
+        if self.state == "player_turn" and self.player_characters:
+            current_char = self.player_characters[self.selected_character]
+            
+            # Компактное меню навыков в правом нижнем углу
+            skill_bg_width = int(SCREEN_WIDTH * 0.25)
+            skill_bg_height = int(SCREEN_HEIGHT * 0.15)
+            skill_bg_x = SCREEN_WIDTH - skill_bg_width - 20
+            skill_bg_y = SCREEN_HEIGHT - skill_bg_height - 20
+            
+            skill_bg = pygame.Surface((skill_bg_width, skill_bg_height))
+            skill_bg.set_alpha(220)
+            skill_bg.fill((20, 25, 50))
+            surface.blit(skill_bg, (skill_bg_x, skill_bg_y))
+            
+            # Заголовок с именем персонажа
+            name_text = small_font.render(f"{current_char.name}", True, WHITE)
+            surface.blit(name_text, (skill_bg_x + 10, skill_bg_y + 5))
+            
+            # Навыки в одну строку
+            skill_start_x = skill_bg_x + 10
+            skill_y = skill_bg_y + 25
+            skill_spacing = skill_bg_width // 4
+            
+            for i, skill in enumerate(current_char.skills):
+                skill_x = skill_start_x + i * skill_spacing
+                
+                # Фон навыка
+                skill_rect = pygame.Rect(skill_x, skill_y, skill_spacing - 10, 40)
+                
+                if skill.is_ultimate:
+                    skill_color = PURPLE
+                    available = current_char.energy >= 100
+                else:
+                    skill_color = BLUE if i == 0 else GREEN
+                    available = current_char.skill_points >= skill.skill_points_cost or i == 0
+                
+                if not available:
+                    skill_color = (100, 100, 100)
+                
+                pygame.draw.rect(surface, skill_color, skill_rect, border_radius=5)
+                pygame.draw.rect(surface, WHITE, skill_rect, 2, border_radius=5)
+                
+                # Подсветка выбранного навыка
+                if i == self.selected_skill:
+                    pygame.draw.rect(surface, YELLOW, skill_rect, 3, border_radius=5)
+                
+                # Номер навыка
+                num_text = small_font.render(str(i+1), True, WHITE)
+                surface.blit(num_text, (skill_x + 5, skill_y + 5))
+                
+                # Короткое название
+                name_parts = skill.name.split()
+                short_name = name_parts[0][:4] if name_parts else skill.name[:4]
+                name_text = small_font.render(short_name, True, WHITE)
+                surface.blit(name_text, (skill_x + 5, skill_y + 20))
+            
+            # Счетчик очков навыков в правом нижнем углу
+            sp_bg = pygame.Surface((80, 30))
+            sp_bg.set_alpha(200)
+            sp_bg.fill((0, 30, 60))
+            surface.blit(sp_bg, (SCREEN_WIDTH - 90, SCREEN_HEIGHT - skill_bg_height - 60))
+            
+            sp_text = small_font.render(f"Очки: {current_char.skill_points}/{current_char.max_skill_points}", True, CYAN)
+            surface.blit(sp_text, (SCREEN_WIDTH - 85, SCREEN_HEIGHT - skill_bg_height - 55))
+            
+            # Энергия ультимейта
+            energy_text = small_font.render(f"Энергия: {current_char.energy}/100", True, PURPLE)
+            surface.blit(energy_text, (SCREEN_WIDTH - 85, SCREEN_HEIGHT - skill_bg_height - 35))
+            
+            # Подсказки управления
+            controls_text = small_font.render("1-3: навыки, ←→: цели, Пробел: атака, Tab: переключение", True, YELLOW)
+            surface.blit(controls_text, (20, SCREEN_HEIGHT - 25))
+    
+    def add_to_log(self, message):
+        self.battle_log.append(message)
+        # Лог теперь не отображается, но сохраняется для отладки
+        if len(self.battle_log) > 50:
+            self.battle_log.pop(0)
+    
+    def player_select_skill(self, skill_index):
+        if (self.player_characters and 
+            0 <= skill_index < len(self.player_characters[self.selected_character].skills)):
+            self.selected_skill = skill_index
+    
+    def player_select_target(self, target_index):
+        if self.enemies and 0 <= target_index < len(self.enemies):
+            self.selected_target = target_index
+    
+    def player_use_skill(self):
+        if self.state != "player_turn" or not self.player_characters:
+            return False
+        
+        current_char = self.player_characters[self.selected_character]
+        
+        if not current_char.skills:
+            return False
+        
+        skill = current_char.skills[self.selected_skill]
+        
+        # Определяем цели
+        targets = []
+        if skill.target_type == "single":
+            if self.enemies and self.selected_target < len(self.enemies) and self.enemies[self.selected_target].current_hp > 0:
+                targets = [self.enemies[self.selected_target]]
+            else:
+                # Автоматически выбираем первого живого врага
+                for enemy in self.enemies:
+                    if enemy.current_hp > 0:
+                        targets = [enemy]
+                        self.selected_target = self.enemies.index(enemy)
+                        break
+                
+                if not targets:
+                    return False
+        elif skill.target_type == "aoe":
+            targets = [enemy for enemy in self.enemies if enemy.current_hp > 0]
+            if not targets:
+                return False
+        elif skill.target_type == "self":
+            targets = [current_char]
+        elif skill.target_type == "ally":
+            targets = [char for char in self.player_characters if char.current_hp > 0]
+            if not targets:
+                return False
+        
+        # Используем навык
+        success, results = skill.use(current_char, targets)
+        
+        if success:
+            # Запускаем специальную анимацию
+            if skill.is_ultimate:
+                current_char.trigger_special_animation("ultimate")
+                current_char.energy = 0  # Тратим всю энергию
+            else:
+                current_char.trigger_special_animation("skill")
+            
+            # Переходим к следующему ходу с задержкой
+            self.waiting_for_enemy_turn = True
+            self.enemy_turn_timer = 1.0
+            return True
+        
+        return False
+    
+    def enemy_turn(self):
+        if self.state != "enemy_turn" or not self.enemies:
+            self.next_turn()
+            return
+        
+        current_enemy = self.turn_order[self.current_turn][1]
+        
+        # Простой ИИ для врагов
+        available_targets = [char for char in self.player_characters if char.current_hp > 0]
+        if not available_targets:
+            self.next_turn()
+            return
+        
+        target = random.choice(available_targets)
+        
+        # Босс имеет специальную атаку с горением
+        if current_enemy.type == "boss" and random.random() < 0.3:
+            burn_damage = current_enemy.attack // 2
+            target.burn_effect = BurnEffect(burn_damage, 2)
+            actual_damage = burn_damage
+        else:
+            # Обычная атака
+            damage = current_enemy.attack
+            actual_damage = target.take_damage(damage)
+        
+        # Эффект урона
+        self.skill_effects.append({
+            'type': 'damage_text',
+            'text': f"-{actual_damage}",
+            'color': RED,
+            'x': target.position[0] - 20,
+            'y': target.position[1] - 50,
+            'timer': 2.0
+        })
+        
+        # Сразу переходим к следующему ходу
+        self.next_turn()
+    
+    def next_turn(self):
+        # Восстанавливаем очки навыков в начале хода
+        for char in self.player_characters:
+            if char.current_hp > 0:
+                char.add_skill_point()
+        
+        self.current_turn += 1
+        if self.current_turn >= len(self.turn_order):
+            self.current_turn = 0
+            self.calculate_turn_order()
+        
+        # Пропускаем мертвых персонажей
+        while (self.current_turn < len(self.turn_order) and 
+               self.turn_order[self.current_turn][1].current_hp <= 0):
+            self.current_turn += 1
+        
+        if self.current_turn >= len(self.turn_order):
+            self.current_turn = 0
+            self.calculate_turn_order()
+        
+        # Определяем, чей сейчас ход
+        if self.turn_order and self.turn_order[self.current_turn][0] == "player":
+            self.state = "player_turn"
+            # Сбрасываем таймер автопереключения
+            self.auto_switch_timer = 0
+            # Выбираем первого живого персонажа
+            for i, char in enumerate(self.player_characters):
+                if char.current_hp > 0:
+                    self.selected_character = i
+                    break
+        else:
+            self.state = "enemy_turn"
+            # Запускаем ход врага с задержкой
+            self.waiting_for_enemy_turn = True
+            self.enemy_turn_timer = 1.0
+
+# Класс игры
+class Game:
+    def __init__(self):
+        self.state = GameState.MAIN_MENU
+        self.player_characters = []
+        self.current_battle = None
+        self.current_round = 1
+        self.total_rounds = 3
+        self.particle_system = ParticleSystem()
+        self.stars_bg = []
+        self.initialize_stars()
+        
+        # Создаем предопределенных персонажей с новой системой навыков
+        self.available_characters = [
+            Character("Старший Брат", CharacterType.WARRIOR, 150, 25, 10, 8),
+            Character("Магистр Пончика", CharacterType.MAGE, 100, 35, 5, 6),
+            Character("Теневой Программист", CharacterType.ROGUE, 120, 30, 8, 12),
+            Character("Целитель Кода", CharacterType.HEALER, 130, 15, 7, 7),
+            # Новые персонажи
+            Character("Амарок", CharacterType.ICE_MAGE, 110, 20, 8, 9),
+            Character("Нокс", CharacterType.ELECTRIC_MAGE, 95, 40, 4, 11),
+            Character("Мирай", CharacterType.FIRE_MAGE, 100, 38, 5, 10),
+            Character("Алекс", CharacterType.FIRE_MAGE, 105, 36, 6, 8),
+            Character("Шумка", CharacterType.WIND_MAGE, 140, 18, 12, 7)
+        ]
+        
+        # Добавляем навыки персонажам по системе HSR
+        self.available_characters[0].skills = [
+            Skill("Удар Клавиатурой", "Мощный удар по врагу", 25, 0, "single"),
+            Skill("Вихрь Отладки", "Атака по всем врагам", 20, 1, "aoe"),
+            Skill("Серверный Краш", "Мощнейшая атака по всем врагам", 50, 0, "aoe", is_ultimate=True)
+        ]
+        
+        self.available_characters[1].skills = [
+            Skill("Магический Баг", "Магическая атака по врагу", 30, 0, "single"),
+            Skill("Взрыв Памяти", "Сильная атака по всем врагам", 30, 1, "aoe"),
+            Skill("Бесконечный Цикл", "Сверхмощная магическая атака", 60, 0, "single", is_ultimate=True)
+        ]
+        
+        self.available_characters[2].skills = [
+            Skill("Скрытая Уязвимость", "Атака с шансом критического урона", 28, 0, "single"),
+            Skill("Теневой Клон", "Создает иллюзию для отвлечения врага", 0, 1, "self", "dodge"),
+            Skill("Фатальный Исход", "Смертоносная атака по одному врагу", 80, 0, "single", is_ultimate=True)
+        ]
+        
+        self.available_characters[3].skills = [
+            Skill("Исцеляющий Патч", "Восстанавливает HP союзнику", 30, 0, "ally", "heal"),
+            Skill("Защитный Скрипт", "Увеличивает защиту союзника", 0, 1, "ally", "buff_defense"),
+            Skill("Абсолютное Восстановление", "Полностью лечит всех союзников", 100, 0, "ally", "heal", is_ultimate=True)
+        ]
+        
+        # Навыки новых персонажей
+        self.available_characters[4].skills = [
+            Skill("Ледяная Стрела", "Ледяная атака, замедляющая врага", 22, 0, "single"),
+            Skill("Арктический Вихрь", "Замораживает всех врагов, снижая их скорость", 15, 1, "aoe", "freeze", 5),
+            Skill("Абсолютный Ноль", "Полная остановка времени для всех врагов", 40, 0, "aoe", "freeze", 10, is_ultimate=True)
+        ]
+        
+        self.available_characters[5].skills = [
+            Skill("Удар Молнии", "Электрическая атака по врагу", 35, 0, "single"),
+            Skill("Гроза", "Мощная электрическая атака по всем врагам", 25, 1, "aoe"),
+            Skill("Удар Тора", "Мощнейший разряд молнии по всем врагам", 55, 0, "aoe", is_ultimate=True)
+        ]
+        
+        self.available_characters[6].skills = [
+            Skill("Огненный Шар", "Огненная атака по врагу", 32, 0, "single"),
+            Skill("Огненный Шторм", "Сжигает всех врагов", 28, 1, "aoe", "burn", 8),
+            Skill("Солнечная Вспышка", "Испепеляющая атака по всем врагам", 65, 0, "aoe", "burn", 15, is_ultimate=True)
+        ]
+        
+        self.available_characters[7].skills = [
+            Skill("Пламенный Удар", "Огненная атака по врагу", 30, 0, "single"),
+            Skill("Вулканический Взрыв", "Мощный взрыв по области", 35, 1, "aoe"),
+            Skill("Адское Пламя", "Призыв адского пламени на врагов", 70, 0, "aoe", "burn", 20, is_ultimate=True)
+        ]
+        
+        self.available_characters[8].skills = [
+            Skill("Ветряной Удар", "Атака ветром по врагу", 20, 0, "single"),
+            Skill("Вихревой Щит", "Создает защитный щит для всех союзников", 0, 1, "ally", "shield", 15),
+            Skill("Божественный Вихрь", "Мощнейший защитный барьер", 0, 0, "ally", "shield", 30, is_ultimate=True)
+        ]
+    
+    def initialize_stars(self):
+        for _ in range(100):
+            self.stars_bg.append({
+                'x': random.randint(0, SCREEN_WIDTH),
+                'y': random.randint(0, SCREEN_HEIGHT),
+                'size': random.randint(1, 3),
+                'speed': random.uniform(0.1, 0.5)
+            })
+    
+    def update_stars(self):
+        for star in self.stars_bg:
+            star['y'] += star['speed']
+            if star['y'] > SCREEN_HEIGHT:
+                star['y'] = 0
+                star['x'] = random.randint(0, SCREEN_WIDTH)
+    
+    def draw_stars(self, surface):
+        for star in self.stars_bg:
+            pygame.draw.circle(surface, WHITE, (int(star['x']), int(star['y'])), star['size'])
+    
+    def create_enemies_for_round(self, round_number):
+        if round_number == 1:
+            return [
+                Enemy("Злобный Баг", 100, 22, 6, 7, "normal"),
+                Enemy("Серверный Краш", 150, 18, 12, 5, "tank"),
+                Enemy("Вирус-Вымогатель", 80, 28, 4, 12, "fast")
+            ]
+        elif round_number == 2:
+            return [
+                Enemy("Глитч-Демон", 120, 25, 8, 8, "normal"),
+                Enemy("Файрволл", 180, 20, 15, 4, "tank"),
+                Enemy("Хакер-Призрак", 90, 30, 5, 14, "fast"),
+                Enemy("Троянский Конь", 110, 22, 10, 6, "normal")
+            ]
+        elif round_number == 3:
+            return [
+                Enemy("Огненный Титан", 400, 40, 25, 6, "boss")
+            ]
+        return []
+    
+    def start_next_round(self):
+        if self.current_round <= self.total_rounds:
+            enemies = self.create_enemies_for_round(self.current_round)
+            self.current_battle = Battle(self.player_characters, enemies, self.current_round)
+            self.state = GameState.BATTLE
+        else:
+            self.state = GameState.VICTORY
+    
+    def update(self, dt):
+        self.update_stars()
+        self.particle_system.update(dt)
+        
+        if self.state == GameState.BATTLE and self.current_battle:
+            self.current_battle.update(dt)
+            
+            if self.current_battle.state == "victory":
+                if self.current_round < self.total_rounds:
+                    self.current_round += 1
+                    self.state = GameState.BETWEEN_ROUNDS
+                    # Восстанавливаем здоровье персонажей между раундами
+                    for char in self.player_characters:
+                        char.current_hp = min(char.max_hp, char.current_hp + 50)
+                        char.skill_points = char.max_skill_points
+                        char.energy = 0
+                else:
+                    self.state = GameState.VICTORY
+            elif self.current_battle.state == "defeat":
+                self.state = GameState.GAME_OVER
+    
+    def draw(self, surface):
+        surface.fill(BACKGROUND)
+        
+        # Звездный фон для всех меню
+        if self.state in [GameState.MAIN_MENU, GameState.CHARACTER_SELECT, GameState.VICTORY, GameState.GAME_OVER, GameState.BETWEEN_ROUNDS]:
+            self.draw_stars(surface)
+        
+        self.particle_system.draw(surface)
+        
+        if self.state == GameState.MAIN_MENU:
+            self.draw_main_menu(surface)
+        elif self.state == GameState.CHARACTER_SELECT:
+            self.draw_character_select(surface)
+        elif self.state == GameState.BATTLE:
+            self.current_battle.draw(surface)
+        elif self.state == GameState.VICTORY:
+            self.draw_victory_screen(surface)
+        elif self.state == GameState.GAME_OVER:
+            self.draw_game_over_screen(surface)
+        elif self.state == GameState.BETWEEN_ROUNDS:
+            self.draw_between_rounds(surface)
+        
+        # Отображаем версию игры в углу
+        version_text = small_font.render(GAME_VERSION, True, WHITE)
+        surface.blit(version_text, (SCREEN_WIDTH - version_text.get_width() - 10, 10))
+    
+    def draw_main_menu(self, surface):
+        # Заголовок с тенью
+        title_text = title_font.render("HONKAI STAR FAIL", True, PURPLE)
+        title_shadow = title_font.render("HONKAI STAR FAIL", True, (100, 0, 150))
+        surface.blit(title_shadow, (SCREEN_WIDTH // 2 - title_shadow.get_width() // 2 + 3, SCREEN_HEIGHT * 0.2 + 3))
+        surface.blit(title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, SCREEN_HEIGHT * 0.2))
+        
+        subtitle = subtitle_font.render("Пародийное Приключение", True, CYAN)
+        surface.blit(subtitle, (SCREEN_WIDTH // 2 - subtitle.get_width() // 2, SCREEN_HEIGHT * 0.3))
+        
+        # Кнопки в стиле HSR
+        button_width = int(SCREEN_WIDTH * 0.25)
+        button_height = int(SCREEN_HEIGHT * 0.08)
+        button_x = SCREEN_WIDTH // 2 - button_width // 2
+        
+        # Кнопка "Начать Игру"
+        start_button = pygame.Rect(button_x, SCREEN_HEIGHT * 0.5, button_width, button_height)
+        pygame.draw.rect(surface, BLUE, start_button, border_radius=10)
+        pygame.draw.rect(surface, LIGHT_BLUE, start_button, 3, border_radius=10)
+        start_text = normal_font.render("Начать Игру", True, WHITE)
+        surface.blit(start_text, (SCREEN_WIDTH // 2 - start_text.get_width() // 2, SCREEN_HEIGHT * 0.5 + button_height//2 - start_text.get_height()//2))
+        
+        # Кнопка "Выйти"
+        quit_button = pygame.Rect(button_x, SCREEN_HEIGHT * 0.6, button_width, button_height)
+        pygame.draw.rect(surface, RED, quit_button, border_radius=10)
+        pygame.draw.rect(surface, (255, 100, 100), quit_button, 3, border_radius=10)
+        quit_text = normal_font.render("Выйти", True, WHITE)
+        surface.blit(quit_text, (SCREEN_WIDTH // 2 - quit_text.get_width() // 2, SCREEN_HEIGHT * 0.6 + button_height//2 - quit_text.get_height()//2))
+        
+        # Шутка
+        joke = small_font.render("Готовы к эпичным багам и сломанному геймплею?", True, YELLOW)
+        surface.blit(joke, (SCREEN_WIDTH // 2 - joke.get_width() // 2, SCREEN_HEIGHT * 0.75))
+        
+        # Подсказка
+        hint = small_font.render("Система очков навыков как в Honkai: Star Rail!", True, GREEN)
+        surface.blit(hint, (SCREEN_WIDTH // 2 - hint.get_width() // 2, SCREEN_HEIGHT * 0.8))
+    
+    def draw_character_select(self, surface):
+        title = title_font.render("Выберите Персонажей", True, CYAN)
+        surface.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, SCREEN_HEIGHT * 0.05))
+        
+        # Улучшенное меню выбора персонажей
+        chars_per_row = 3
+        char_width = SCREEN_WIDTH // (chars_per_row + 1)
+        char_height = SCREEN_HEIGHT * 0.25
+        
+        for i, char in enumerate(self.available_characters):
+            row = i // chars_per_row
+            col = i % chars_per_row
+            x = char_width * (col + 1)
+            y = SCREEN_HEIGHT * 0.2 + row * char_height
+            
+            # Фон персонажа с подсветкой если выбран
+            char_bg_width = int(SCREEN_WIDTH * 0.25)
+            char_bg_height = int(SCREEN_HEIGHT * 0.2)
+            char_bg = pygame.Surface((char_bg_width, char_bg_height), pygame.SRCALPHA)
+            
+            if char in self.player_characters:
+                char_bg.fill((0, 100, 0, 200))  # Зеленый для выбранных
+            else:
+                char_bg.fill((0, 0, 50, 200))   # Синий для невыбранных
+            
+            surface.blit(char_bg, (x - char_bg_width // 2, y - char_bg_height // 2))
+            
+            # Отрисовываем персонажа
+            char.draw(surface, x, y)
+            
+            # Статы персонажа
+            stats_text = small_font.render(f"HP: {char.max_hp} ATK: {char.attack} DEF: {char.defense}", True, WHITE)
+            surface.blit(stats_text, (x - stats_text.get_width() // 2, y + char_bg_height // 2 + 10))
+            
+            # Кнопка выбора
+            btn_width = int(SCREEN_WIDTH * 0.1)
+            btn_height = int(SCREEN_HEIGHT * 0.04)
+            btn_x = x - btn_width // 2
+            btn_y = y + char_bg_height // 2 + 35
+            
+            if char in self.player_characters:
+                btn_color = GREEN
+                btn_text = "✓ Выбран"
+            else:
+                btn_color = BLUE
+                btn_text = "Выбрать"
+            
+            pygame.draw.rect(surface, btn_color, (btn_x, btn_y, btn_width, btn_height), border_radius=5)
+            pygame.draw.rect(surface, WHITE, (btn_x, btn_y, btn_width, btn_height), 2, border_radius=5)
+            select_text = small_font.render(btn_text, True, WHITE)
+            surface.blit(select_text, (x - select_text.get_width() // 2, btn_y + btn_height//2 - select_text.get_height()//2))
+        
+        # Кнопка начала боя
+        button_width = int(SCREEN_WIDTH * 0.2)
+        button_height = int(SCREEN_HEIGHT * 0.07)
+        button_x = SCREEN_WIDTH // 2 - button_width // 2
+        button_y = SCREEN_HEIGHT * 0.85
+        
+        if len(self.player_characters) >= 1:
+            start_button = pygame.Rect(button_x, button_y, button_width, button_height)
+            pygame.draw.rect(surface, ORANGE, start_button, border_radius=10)
+            pygame.draw.rect(surface, YELLOW, start_button, 3, border_radius=10)
+            start_text = normal_font.render("Начать Бой!", True, WHITE)
+            surface.blit(start_text, (SCREEN_WIDTH // 2 - start_text.get_width() // 2, button_y + button_height//2 - start_text.get_height()//2))
+        else:
+            start_button = pygame.Rect(button_x, button_y, button_width, button_height)
+            pygame.draw.rect(surface, (100, 100, 100), start_button, border_radius=10)
+            start_text = normal_font.render("Выберите персонажей", True, WHITE)
+            surface.blit(start_text, (SCREEN_WIDTH // 2 - start_text.get_width() // 2, button_y + button_height//2 - start_text.get_height()//2))
+        
+        # Подсказка
+        hint = small_font.render("Выберите от 1 до 4 персонажей для боя", True, YELLOW)
+        surface.blit(hint, (SCREEN_WIDTH // 2 - hint.get_width() // 2, SCREEN_HEIGHT * 0.92))
+        
+        # Информация о системе навыков
+        skill_info = small_font.render("Базовый навык: 0 очков | Усиленный: 1 очко | Ультимейт: энергия", True, GREEN)
+        surface.blit(skill_info, (SCREEN_WIDTH // 2 - skill_info.get_width() // 2, SCREEN_HEIGHT * 0.95))
+    
+    def draw_between_rounds(self, surface):
+        title = title_font.render(f"РАУНД {self.current_round} ПРОЙДЕН!", True, YELLOW)
+        surface.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, SCREEN_HEIGHT * 0.3))
+        
+        # Сообщение
+        message = subtitle_font.render("Подготовка к следующему раунду...", True, CYAN)
+        surface.blit(message, (SCREEN_WIDTH // 2 - message.get_width() // 2, SCREEN_HEIGHT * 0.4))
+        
+        # Восстановление здоровья
+        heal_info = normal_font.render("Ваши персонажи восстановили 50 HP и все очки навыков!", True, GREEN)
+        surface.blit(heal_info, (SCREEN_WIDTH // 2 - heal_info.get_width() // 2, SCREEN_HEIGHT * 0.5))
+        
+        # Кнопка продолжения
+        button_width = int(SCREEN_WIDTH * 0.25)
+        button_height = int(SCREEN_HEIGHT * 0.08)
+        button_x = SCREEN_WIDTH // 2 - button_width // 2
+        
+        continue_button = pygame.Rect(button_x, SCREEN_HEIGHT * 0.65, button_width, button_height)
+        pygame.draw.rect(surface, ORANGE, continue_button, border_radius=10)
+        pygame.draw.rect(surface, YELLOW, continue_button, 3, border_radius=10)
+        continue_text = normal_font.render("Продолжить", True, WHITE)
+        surface.blit(continue_text, (SCREEN_WIDTH // 2 - continue_text.get_width() // 2, SCREEN_HEIGHT * 0.65 + button_height//2 - continue_text.get_height()//2))
+    
+    def draw_victory_screen(self, surface):
+        title = title_font.render("ПОБЕДА!", True, YELLOW)
+        surface.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, SCREEN_HEIGHT * 0.2))
+        
+        # Поздравление
+        congrats = subtitle_font.render("Вы прошли все раунды!", True, GREEN)
+        surface.blit(congrats, (SCREEN_WIDTH // 2 - congrats.get_width() // 2, SCREEN_HEIGHT * 0.3))
+        
+        # Шутка
+        joke = normal_font.render("Все баги повержены, код скомпилирован!", True, CYAN)
+        surface.blit(joke, (SCREEN_WIDTH // 2 - joke.get_width() // 2, SCREEN_HEIGHT * 0.4))
+        
+        # Кнопки
+        button_width = int(SCREEN_WIDTH * 0.25)
+        button_height = int(SCREEN_HEIGHT * 0.08)
+        button_x = SCREEN_WIDTH // 2 - button_width // 2
+        
+        # Кнопка "Новый Бой"
+        restart_button = pygame.Rect(button_x, SCREEN_HEIGHT * 0.55, button_width, button_height)
+        pygame.draw.rect(surface, BLUE, restart_button, border_radius=10)
+        pygame.draw.rect(surface, LIGHT_BLUE, restart_button, 3, border_radius=10)
+        restart_text = normal_font.render("Новый Бой", True, WHITE)
+        surface.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT * 0.55 + button_height//2 - restart_text.get_height()//2))
+        
+        # Кнопка "В Главное Меню"
+        menu_button = pygame.Rect(button_x, SCREEN_HEIGHT * 0.65, button_width, button_height)
+        pygame.draw.rect(surface, GREEN, menu_button, border_radius=10)
+        pygame.draw.rect(surface, (100, 255, 100), menu_button, 3, border_radius=10)
+        menu_text = normal_font.render("В Главное Меню", True, WHITE)
+        surface.blit(menu_text, (SCREEN_WIDTH // 2 - menu_text.get_width() // 2, SCREEN_HEIGHT * 0.65 + button_height//2 - menu_text.get_height()//2))
+    
+    def draw_game_over_screen(self, surface):
+        title = title_font.render("ПОРАЖЕНИЕ", True, RED)
+        surface.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, SCREEN_HEIGHT * 0.2))
+        
+        # Сообщение
+        message = subtitle_font.render("Ваша команда была побеждена!", True, ORANGE)
+        surface.blit(message, (SCREEN_WIDTH // 2 - message.get_width() // 2, SCREEN_HEIGHT * 0.3))
+        
+        # Шутка
+        joke = normal_font.render("Кажется, нужно больше тестировать...", True, YELLOW)
+        surface.blit(joke, (SCREEN_WIDTH // 2 - joke.get_width() // 2, SCREEN_HEIGHT * 0.4))
+        
+        # Кнопки
+        button_width = int(SCREEN_WIDTH * 0.25)
+        button_height = int(SCREEN_HEIGHT * 0.08)
+        button_x = SCREEN_WIDTH // 2 - button_width // 2
+        
+        # Кнопка "Попробовать Снова"
+        restart_button = pygame.Rect(button_x, SCREEN_HEIGHT * 0.55, button_width, button_height)
+        pygame.draw.rect(surface, BLUE, restart_button, border_radius=10)
+        pygame.draw.rect(surface, LIGHT_BLUE, restart_button, 3, border_radius=10)
+        restart_text = normal_font.render("Попробовать Снова", True, WHITE)
+        surface.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT * 0.55 + button_height//2 - restart_text.get_height()//2))
+        
+        # Кнопка "В Главное Меню"
+        menu_button = pygame.Rect(button_x, SCREEN_HEIGHT * 0.65, button_width, button_height)
+        pygame.draw.rect(surface, GREEN, menu_button, border_radius=10)
+        pygame.draw.rect(surface, (100, 255, 100), menu_button, 3, border_radius=10)
+        menu_text = normal_font.render("В Главное Меню", True, WHITE)
+        surface.blit(menu_text, (SCREEN_WIDTH // 2 - menu_text.get_width() // 2, SCREEN_HEIGHT * 0.65 + button_height//2 - menu_text.get_height()//2))
+    
+    def handle_event(self, event):
+        if event.type == pygame.QUIT:
+            return False
+        
+        if event.type == pygame.VIDEORESIZE:
+            global SCREEN_WIDTH, SCREEN_HEIGHT
+            SCREEN_WIDTH, SCREEN_HEIGHT = event.size
+            SCREEN_WIDTH = max(SCREEN_WIDTH, MIN_WIDTH)
+            SCREEN_HEIGHT = max(SCREEN_HEIGHT, MIN_HEIGHT)
+            screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
+            
+            # Обновляем относительные размеры
+            global PLAYER_Y, ENEMY_Y, CHARACTER_SPACING
+            PLAYER_Y = int(SCREEN_HEIGHT * 0.75)
+            ENEMY_Y = int(SCREEN_HEIGHT * 0.4)
+            CHARACTER_SPACING = int(SCREEN_WIDTH * 0.15)
+            
+            # Обновляем шрифты
+            try:
+                title_font = pygame.font.SysFont("comicsansms", int(SCREEN_HEIGHT * 0.06), bold=True)
+                subtitle_font = pygame.font.SysFont("comicsansms", int(SCREEN_HEIGHT * 0.04), bold=True)
+                normal_font = pygame.font.SysFont("comicsansms", int(SCREEN_HEIGHT * 0.03))
+                small_font = pygame.font.SysFont("comicsansms", int(SCREEN_HEIGHT * 0.02))
+            except:
+                title_font = pygame.font.SysFont("arial", int(SCREEN_HEIGHT * 0.06), bold=True)
+                subtitle_font = pygame.font.SysFont("arial", int(SCREEN_HEIGHT * 0.04), bold=True)
+                normal_font = pygame.font.SysFont("arial", int(SCREEN_HEIGHT * 0.03))
+                small_font = pygame.font.SysFont("arial", int(SCREEN_HEIGHT * 0.02))
+        
+        if event.type == pygame.KEYDOWN:
+            if self.state == GameState.BATTLE:
+                if event.key == pygame.K_1:
+                    self.current_battle.player_select_skill(0)
+                elif event.key == pygame.K_2 and len(self.current_battle.player_characters[self.current_battle.selected_character].skills) > 1:
+                    self.current_battle.player_select_skill(1)
+                elif event.key == pygame.K_3 and len(self.current_battle.player_characters[self.current_battle.selected_character].skills) > 2:
+                    self.current_battle.player_select_skill(2)
+                elif event.key == pygame.K_LEFT:
+                    if self.current_battle.enemies:
+                        self.current_battle.selected_target = max(0, self.current_battle.selected_target - 1)
+                elif event.key == pygame.K_RIGHT:
+                    if self.current_battle.enemies:
+                        self.current_battle.selected_target = min(len(self.current_battle.enemies) - 1, self.current_battle.selected_target + 1)
+                elif event.key == pygame.K_SPACE:
+                    self.current_battle.player_use_skill()
+                elif event.key == pygame.K_TAB:
+                    # Ручное переключение персонажа
+                    if self.current_battle.player_characters:
+                        start_index = self.current_battle.selected_character
+                        next_index = (start_index + 1) % len(self.current_battle.player_characters)
+                        while (next_index != start_index and 
+                               self.current_battle.player_characters[next_index].current_hp <= 0):
+                            next_index = (next_index + 1) % len(self.current_battle.player_characters)
+                        
+                        if self.current_battle.player_characters[next_index].current_hp > 0:
+                            self.current_battle.selected_character = next_index
+                            self.current_battle.auto_switch_timer = 0  # Сбрасываем таймер автопереключения
+        
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos = pygame.mouse.get_pos()
+            
+            if self.state == GameState.MAIN_MENU:
+                # Кнопка "Начать Игру"
+                button_width = int(SCREEN_WIDTH * 0.25)
+                button_height = int(SCREEN_HEIGHT * 0.08)
+                button_x = SCREEN_WIDTH // 2 - button_width // 2
+                
+                if (button_x <= mouse_pos[0] <= button_x + button_width and 
+                    SCREEN_HEIGHT * 0.5 <= mouse_pos[1] <= SCREEN_HEIGHT * 0.5 + button_height):
+                    self.state = GameState.CHARACTER_SELECT
+                
+                # Кнопка "Выйти"
+                elif (button_x <= mouse_pos[0] <= button_x + button_width and 
+                      SCREEN_HEIGHT * 0.6 <= mouse_pos[1] <= SCREEN_HEIGHT * 0.6 + button_height):
+                    return False
+            
+            elif self.state == GameState.CHARACTER_SELECT:
+                # Кнопки выбора персонажей
+                chars_per_row = 3
+                char_width = SCREEN_WIDTH // (chars_per_row + 1)
+                char_height = SCREEN_HEIGHT * 0.25
+                
+                for i, char in enumerate(self.available_characters):
+                    row = i // chars_per_row
+                    col = i % chars_per_row
+                    x = char_width * (col + 1)
+                    y = SCREEN_HEIGHT * 0.2 + row * char_height
+                    
+                    btn_width = int(SCREEN_WIDTH * 0.1)
+                    btn_height = int(SCREEN_HEIGHT * 0.04)
+                    btn_x = x - btn_width // 2
+                    btn_y = y + int(SCREEN_HEIGHT * 0.1) + 35
+                    
+                    if (btn_x <= mouse_pos[0] <= btn_x + btn_width and 
+                        btn_y <= mouse_pos[1] <= btn_y + btn_height):
+                        if char in self.player_characters:
+                            self.player_characters.remove(char)
+                        else:
+                            if len(self.player_characters) < 4:
+                                self.player_characters.append(char)
+                
+                # Кнопка "Начать Бой!"
+                button_width = int(SCREEN_WIDTH * 0.2)
+                button_height = int(SCREEN_HEIGHT * 0.07)
+                button_x = SCREEN_WIDTH // 2 - button_width // 2
+                button_y = SCREEN_HEIGHT * 0.85
+                
+                if (button_x <= mouse_pos[0] <= button_x + button_width and 
+                    button_y <= mouse_pos[1] <= button_y + button_height and 
+                    len(self.player_characters) >= 1):
+                    self.current_round = 1
+                    self.start_next_round()
+            
+            elif self.state == GameState.BETWEEN_ROUNDS:
+                # Кнопка "Продолжить"
+                button_width = int(SCREEN_WIDTH * 0.25)
+                button_height = int(SCREEN_HEIGHT * 0.08)
+                button_x = SCREEN_WIDTH // 2 - button_width // 2
+                button_y = SCREEN_HEIGHT * 0.65
+                
+                if (button_x <= mouse_pos[0] <= button_x + button_width and 
+                    button_y <= mouse_pos[1] <= button_y + button_height):
+                    self.start_next_round()
+            
+            elif self.state == GameState.VICTORY:
+                # Кнопка "Новый Бой"
+                button_width = int(SCREEN_WIDTH * 0.25)
+                button_height = int(SCREEN_HEIGHT * 0.08)
+                button_x = SCREEN_WIDTH // 2 - button_width // 2
+                
+                if (button_x <= mouse_pos[0] <= button_x + button_width and 
+                    SCREEN_HEIGHT * 0.55 <= mouse_pos[1] <= SCREEN_HEIGHT * 0.55 + button_height):
+                    self.state = GameState.CHARACTER_SELECT
+                    self.player_characters = []
+                    self.current_round = 1
+                
+                # Кнопка "В Главное Меню"
+                elif (button_x <= mouse_pos[0] <= button_x + button_width and 
+                      SCREEN_HEIGHT * 0.65 <= mouse_pos[1] <= SCREEN_HEIGHT * 0.65 + button_height):
+                    self.state = GameState.MAIN_MENU
+                    self.player_characters = []
+                    self.current_round = 1
+            
+            elif self.state == GameState.GAME_OVER:
+                # Кнопка "Попробовать Снова"
+                button_width = int(SCREEN_WIDTH * 0.25)
+                button_height = int(SCREEN_HEIGHT * 0.08)
+                button_x = SCREEN_WIDTH // 2 - button_width // 2
+                
+                if (button_x <= mouse_pos[0] <= button_x + button_width and 
+                    SCREEN_HEIGHT * 0.55 <= mouse_pos[1] <= SCREEN_HEIGHT * 0.55 + button_height):
+                    self.state = GameState.CHARACTER_SELECT
+                    self.player_characters = []
+                    self.current_round = 1
+                
+                # Кнопка "В Главное Меню"
+                elif (button_x <= mouse_pos[0] <= button_x + button_width and 
+                      SCREEN_HEIGHT * 0.65 <= mouse_pos[1] <= SCREEN_HEIGHT * 0.65 + button_height):
+                    self.state = GameState.MAIN_MENU
+                    self.player_characters = []
+                    self.current_round = 1
+        
+        return True
+
+# Основная функция игры
+def main():
+    game = Game()
+    running = True
+    
+    while running:
+        dt = clock.tick(FPS) / 1000.0  # Время в секундах с последнего кадра
+        
+        for event in pygame.event.get():
+            running = game.handle_event(event)
+        
+        game.update(dt)
+        game.draw(screen)
+        
+        pygame.display.flip()
+    
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
